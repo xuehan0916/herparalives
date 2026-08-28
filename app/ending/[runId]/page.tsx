@@ -109,8 +109,17 @@ function drawWrappedText(ctx: CanvasRenderingContext2D, text: string, x: number,
   if (line) lines.push(line); lines.forEach((item, index) => ctx.fillText(item, x, y + index * lineHeight));
 }
 
+function drawImageCover(ctx: CanvasRenderingContext2D, image: HTMLImageElement, width: number, height: number) {
+  const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+  const sourceWidth = width / scale;
+  const sourceHeight = height / scale;
+  const sourceX = (image.naturalWidth - sourceWidth) / 2;
+  const sourceY = Math.max(0, (image.naturalHeight - sourceHeight) * .28);
+  ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+}
+
 export default function EndingPage() {
-  const id = String(useParams().runId); const [run, setRun] = useState<GameRun>(); const [quoteIndex, setQuoteIndex] = useState(0); const [saved, setSaved] = useState(false);
+  const id = String(useParams().runId); const [run, setRun] = useState<GameRun>(); const [quoteIndex, setQuoteIndex] = useState(0); const [saved, setSaved] = useState(false); const [cardFlipped, setCardFlipped] = useState(false);
   useEffect(() => { const current = getRun(id); setRun(current); if (current?.cardQuote) { const found = resolveEndingProfile(current).quotes.indexOf(current.cardQuote); if (found >= 0) setQuoteIndex(found); setSaved(true); } }, [id]);
   const observations = useMemo(() => {
     if (!run) return [];
@@ -123,16 +132,25 @@ export default function EndingPage() {
   const saveCard = () => { const next = { ...run, cardQuote: quote, cardSavedAt: Date.now() }; saveRun(next); setRun(next); setSaved(true); };
   const downloadCard = async () => {
     const canvas = document.createElement("canvas"); canvas.width = 1080; canvas.height = 1440; const ctx = canvas.getContext("2d"); if (!ctx) return;
-    const gradient = ctx.createLinearGradient(0, 0, 1080, 1440); gradient.addColorStop(0, "#665677"); gradient.addColorStop(1, "#282842"); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1080, 1440);
-    const image = new Image(); image.src = getPortrait(run.character.portrait).src; await image.decode(); ctx.globalAlpha = .78; ctx.drawImage(image, 500, 530, 580, 910); ctx.globalAlpha = 1;
-    ctx.fillStyle = "#efb0a5"; ctx.font = "700 28px Arial"; ctx.fillText("她的平行人生 · LIFE COACH", 80, 105);
-    ctx.fillStyle = "#ffffff"; ctx.font = "64px 'Microsoft YaHei'"; drawWrappedText(ctx, quote, 80, 245, 750, 92);
-    ctx.fillStyle = "rgba(255,255,255,.72)"; ctx.font = "30px 'Microsoft YaHei'"; ctx.fillText(`${run.character.name}走过的一条平行线路`, 80, 1220); ctx.font = "24px 'Microsoft YaHei'"; ctx.fillText("没有标准答案，只有仍可继续探索的方向。", 80, 1270);
+    const image = new Image(); image.src = getPortrait(run.character.portrait).src; await image.decode(); drawImageCover(ctx, image, canvas.width, canvas.height);
+    const wash = ctx.createLinearGradient(0, 0, 0, 1440); wash.addColorStop(0, "rgba(30,27,48,.28)"); wash.addColorStop(.42, "rgba(35,29,52,.08)"); wash.addColorStop(.68, "rgba(35,29,52,.58)"); wash.addColorStop(1, "rgba(24,22,40,.96)"); ctx.fillStyle = wash; ctx.fillRect(0, 0, 1080, 1440);
+    const glow = ctx.createRadialGradient(870, 180, 20, 870, 180, 520); glow.addColorStop(0, "rgba(238,177,164,.28)"); glow.addColorStop(1, "rgba(238,177,164,0)"); ctx.fillStyle = glow; ctx.fillRect(0, 0, 1080, 700);
+    ctx.strokeStyle = "rgba(255,255,255,.52)"; ctx.lineWidth = 2; ctx.strokeRect(34, 34, 1012, 1372);
+    ctx.fillStyle = "#f4b8ac"; ctx.font = "700 25px Arial"; ctx.fillText("HER PARALLEL LIVES", 76, 94);
+    ctx.fillStyle = "rgba(255,255,255,.78)"; ctx.font = "24px 'Microsoft YaHei'"; ctx.fillText(`ROUTE KEEPSAKE  ·  ${run.character.name}`, 76, 132);
+    ctx.fillStyle = "rgba(255,255,255,.96)"; ctx.font = "58px 'Microsoft YaHei'"; drawWrappedText(ctx, `“${quote}”`, 76, 1040, 900, 82);
+    ctx.fillStyle = "#f4b8ac"; ctx.fillRect(76, 1287, 72, 3);
+    ctx.fillStyle = "rgba(255,255,255,.76)"; ctx.font = "25px 'Microsoft YaHei'"; ctx.fillText(`${run.character.name} · 第 ${run.branch} 条平行线路`, 76, 1340);
+    ctx.textAlign = "right"; ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.font = "21px 'Microsoft YaHei'"; ctx.fillText("没有标准答案，只有可以带走的方向", 1004, 1340); ctx.textAlign = "left";
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png")); if (!blob) return;
     const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.download = `${run.character.name}-平行人生卡.png`; link.href = url; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <main className="ending-page"><AppHeader compact /><section className="ending-wrap"><header className="reflection-hero"><p className="eyebrow">A PLACE TO LOOK BACK</p><h1>这条路走到了一个<br />可以回望的站台</h1><p>不是终点，也不是对你的定义。Life Coach 只是把这一路反复出现的选择，重新放到你面前。</p></header>
     <article className="coach-reflection"><p className="eyebrow dark">LIFE COACH · 旅途回望</p><h2>{run.character.name}，我从你的选择里看见了这些</h2><div className="observation-grid">{observations.map((item, index) => <section key={item.title}><span>0{index + 1}</span><h3>{item.title}</h3><p>{item.text}</p></section>)}</div><div className="choice-ribbon"><small>你在这条线路留下的脚印</small><p>{run.choices.map((item) => item.choiceLabel).join(" · ")}</p></div></article>
-    <section className="share-studio"><div className="share-copy"><p className="eyebrow dark">MAKE IT YOURS</p><h2>选一句想带走的话</h2><p>这句话不是结论。它只是此刻最想留在你身边的那句提醒。</p><div className="share-controls"><button onClick={() => { setQuoteIndex((quoteIndex + 1) % quotes.length); setSaved(false); }}>换一句</button><button onClick={saveCard}>{saved ? "已保存到图鉴" : "保存到我的图鉴"}</button><button onClick={downloadCard}>下载卡片</button></div></div><div className="journey-card"><div className="journey-card-copy"><small>她的平行人生 · LIFE COACH</small><blockquote>“{quote}”</blockquote><p>{run.character.name}走过的一条平行线路</p></div><Portrait id={run.character.portrait} /></div></section>
+    <section className="share-studio"><div className="share-copy"><p className="eyebrow dark">A KEEPSAKE FROM THIS LIFE</p><h2>把这一程，带在身边</h2><p>正面留下一句此刻需要的提醒，背面收好这一路的选择与仍可继续思考的问题。</p><div className="share-controls"><button onClick={() => { setQuoteIndex((quoteIndex + 1) % quotes.length); setSaved(false); setCardFlipped(false); }}>换一句正面的话</button><button onClick={saveCard}>{saved ? "已保存到图鉴" : "保存到我的图鉴"}</button><button onClick={downloadCard}>下载正面卡片</button></div></div>
+      <div className="journey-card-stage"><div className={`journey-card ${cardFlipped ? "is-flipped" : ""}`} role="button" tabIndex={0} aria-pressed={cardFlipped} aria-label={cardFlipped ? "翻回纪念卡正面" : "翻到纪念卡背面"} onClick={() => setCardFlipped(!cardFlipped)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setCardFlipped(!cardFlipped); } }}><div className="journey-card-inner">
+        <article className="journey-card-face journey-card-front"><Portrait id={run.character.portrait} /><div className="journey-card-wash" /><header><small>HER PARALLEL LIVES</small><span>ROUTE KEEPSAKE · {run.character.name}</span></header><div className="journey-card-front-copy"><blockquote>“{quote}”</blockquote><div><i /><p>{run.character.name} · 第 {run.branch} 条平行线路</p></div></div><span className="card-flip-hint">点击翻面 <b>↻</b></span></article>
+        <article className="journey-card-face journey-card-back"><div className="journey-card-back-head"><small>LIFE COACH · ROUTE NOTE</small><span>NO. {String(run.branch).padStart(2, "0")}</span></div><p className="journey-card-back-kicker">这一路，你可以带走的不是答案</p><h3>{observations[2]?.title}</h3><blockquote>{observations[2]?.text}</blockquote><div className="journey-card-footprints"><small>CHOICE FOOTPRINTS</small>{run.choices.slice(-3).map((item, index) => <p key={`${item.nodeId}-${item.choiceId}`}><span>0{index + 1}</span>{item.choiceLabel}</p>)}</div><footer><span>{run.character.name}的平行人生</span><b>点击翻回正面 ↻</b></footer></article>
+      </div></div><p className="journey-card-caption">点击卡片翻面，看看这条线路在背后留下了什么</p></div></section>
     <div className="ending-actions"><Link href={`/map/${id}`}>展开人生地图</Link><Link href="/lobby#sample">再走一条平行线路</Link><Link href="/collection">打开我的图鉴</Link></div></section></main>;
 }

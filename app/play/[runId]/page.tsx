@@ -1,6 +1,6 @@
 "use client";
 import { AppHeader } from "@/components/AppHeader";
-import { ScrollRevealText } from "@/components/ScrollRevealText";
+import { buildNarrativeBeats } from "@/lib/narrative";
 import { getRun, nodesForRun, saveRun } from "@/lib/store";
 import type { ChoiceRecord, GameRun, StatDelta, StoryNode } from "@/lib/types";
 import Image from "next/image";
@@ -17,6 +17,9 @@ const scrollToTop = () => { const ios = iosDevice(); window.setTimeout(() => { i
 export default function PlayPage() {
   const id = String(useParams().runId); const router = useRouter(); const [run, setRun] = useState<GameRun>();
   const [selectedChoiceId, setSelectedChoiceId] = useState<string>();
+  const [storyPage, setStoryPage] = useState(0);
+  const [outcomePage, setOutcomePage] = useState(0);
+  const touchStartRef = useRef<{ x: number; y: number } | undefined>(undefined);
   const [generating, setGenerating] = useState(false);
   const [continueError, setContinueError] = useState("");
   // Prefetch the next chapter while the player is still reading the current one's
@@ -27,6 +30,14 @@ export default function PlayPage() {
   const lastIndexRef = useRef(0);
   useEffect(() => setRun(getRun(id)), [id]);
   const nodes = useMemo(() => run ? nodesForRun(run) : [], [run]); const current = run ? (nodes.find((node) => node.id === run.currentNodeId) ?? nodes[run.currentIndex]) : undefined;
+  const hasDecision = (current?.choices?.length ?? 0) > 0;
+  const narrativeBeats = useMemo(() => current ? buildNarrativeBeats(current.scene, current.dialogue, { maxPages: hasDecision ? 4 : 5 }) : [], [current, hasDecision]);
+  const lastNarrativePage = Math.max(0, narrativeBeats.length - 1);
+  const decisionPage = hasDecision ? narrativeBeats.length : lastNarrativePage;
+  useEffect(() => {
+    const alreadyChosen = Boolean(current && run?.choices.some((choice) => choice.nodeId === current.id));
+    setStoryPage(alreadyChosen && hasDecision ? narrativeBeats.length : 0);
+  }, [current?.id, hasDecision, narrativeBeats.length, run?.choices]);
   useEffect(() => {
     if (!run?.plan || !current) return;
     // Rewinding to an earlier node invalidates a prefetch built on the old choices.
@@ -61,13 +72,22 @@ export default function PlayPage() {
 
   const savedChoice = run.choices.findLast((item) => item.nodeId === current.id);
   const resolvedChoice = current.choices?.find((item) => item.id === (selectedChoiceId || savedChoice?.choiceId));
+  const showingDecision = hasDecision && storyPage === decisionPage;
+  const storyComplete = hasDecision ? showingDecision : storyPage === lastNarrativePage;
+  const currentBeat = showingDecision ? undefined : narrativeBeats[storyPage];
+  const outcomeBeats = resolvedChoice ? buildNarrativeBeats(resolvedChoice.outcome, undefined, { maxPages: 3 }) : [];
+  const lastOutcomePage = Math.max(0, outcomeBeats.length - 1);
+  const outcomeComplete = !resolvedChoice || outcomePage === lastOutcomePage;
+  const journeyComplete = storyComplete && outcomeComplete;
+  const previousStoryPage = () => setStoryPage((page) => Math.max(0, page - 1));
+  const nextStoryPage = () => setStoryPage((page) => Math.min(decisionPage, page + 1));
   const choose = (choiceIndex: number) => {
     if (resolvedChoice) return;
     const selected = current.choices?.[choiceIndex];
     if (!selected) return;
     const record: ChoiceRecord = { nodeId: current.id, choiceId: selected.id, choiceLabel: selected.label, memory: selected.memory, deltas: selected.deltas, at: Date.now() };
     const withChoice = { ...run, choices: [...run.choices, record], updatedAt: Date.now() };
-    saveRun(withChoice); setRun(withChoice); setSelectedChoiceId(selected.id);
+    saveRun(withChoice); setRun(withChoice); setSelectedChoiceId(selected.id); setOutcomePage(0);
     window.setTimeout(() => { const el = document.getElementById("choice-outcome"); if (el) { if (iosDevice()) el.scrollIntoView(); else el.scrollIntoView({ behavior: "smooth", block: "start" }); } }, 50);
   };
   const storyChapterCount = nodes.length ? Math.max(...nodes.map((node) => node.chapter)) : 0;
@@ -151,10 +171,14 @@ export default function PlayPage() {
   const hasPrologue = run.presetId === "test-story";
   const chapterLabel = hasPrologue && current.chapter === 1 ? "PROLOGUE" : `CHAPTER ${hasPrologue ? current.chapter - 1 : current.chapter}`;
   const chapterDeltas = sumChapter(run.choices.filter((item) => nodes.find((storyNode) => storyNode.id === item.nodeId)?.chapter === current.chapter));
-  return <main className="play-page"><AppHeader compact /><div className="chapter-progress"><span>{current.chapterTitle} · 第 {sceneInChapter} 幕</span><div>{chapterNumbers.map((chapter) => <i className={chapter <= current.chapter ? "active" : ""} key={chapter} />)}</div><Link href={`/map/${run.id}`}>查看人生地图</Link></div><section className="story-stage"><div className="scene-art illustrated"><Image src={current.illustration || "/images/linan-ch1-v1.png"} alt={`${current.title}手绘剧情场景`} fill priority sizes="(max-width: 760px) 100vw, 52vw" /><div className="scene-vignette" /><small>关键场景 · 手绘叙事插画</small></div><article className="story-panel">{previous && run.currentIndex > 0 && <p className="memory-echo">人物记得：{previous.memory}</p>}<p className="scene-count">{chapterLabel} · SCENE {sceneInChapter}</p><h1>{current.title}</h1><ScrollRevealText className="scene-text rich-scene" text={current.scene} />{current.dialogue && <blockquote>{current.dialogue}</blockquote>}{!resolvedChoice && (current.choices?.length ?? 0) > 0 && <div className="choices"><p>故事走到这里，{run.character.name}准备如何回应？</p>{(current.choices ?? []).map((item, index) => <button onClick={() => choose(index)} key={item.id}><b>{String.fromCharCode(65 + index)}</b><span><strong>{item.label}</strong><small>{item.hint}</small></span><em>→</em></button>)}</div>}
-    {resolvedChoice && <section className="inline-outcome" id="choice-outcome"><p className="eyebrow">YOUR CHOICE · {resolvedChoice.label}</p><h2>选择之后，生活继续发生</h2><ScrollRevealText className="outcome-story" text={resolvedChoice.outcome} /><div className="consequence-grid"><div><small>获得</small><p>{resolvedChoice.gain}</p></div><div><small>代价</small><p>{resolvedChoice.cost}</p></div><div><small>仍然未知</small><p>{resolvedChoice.unknown}</p></div></div></section>}
-    {current.chapterEnd && <section className="inline-coach"><p className="eyebrow">{chapterLabel} · LIFE COACH</p><h3>这一章，先在这里停一下</h3><p className="chapter-summary">以下五维只记录本章变化，不代表选择的好坏。</p><div className="delta-row">{Object.entries(chapterDeltas).filter(([, value]) => value).map(([key, value]) => <span key={key}><b>{statLabels[key]}</b><em className={(value || 0) > 0 ? "up" : "down"}>{(value || 0) > 0 ? "+" : ""}{value}</em></span>)}</div><div className="coach"><small>章末镜面 · 不替你决定</small><p>{current.coach}</p></div><small className="no-rank">Coach 从本章经历中提出问题，不提供标准答案。</small></section>}
+  return <main className="play-page"><AppHeader compact /><div className="chapter-progress"><span>{current.chapterTitle} · 第 {sceneInChapter} 幕</span><div>{chapterNumbers.map((chapter) => <i className={chapter <= current.chapter ? "active" : ""} key={chapter} />)}</div><Link href={`/map/${run.id}`}>查看人生地图</Link></div><section className="story-stage"><div className="scene-art illustrated"><Image src={current.illustration || "/images/linan-ch1-v1.png"} alt={`${current.title}手绘剧情场景`} fill priority sizes="(max-width: 760px) 100vw, 52vw" /><div className="scene-vignette" /><small>{showingDecision ? "故事走到选择时刻" : `叙事分页 · ${storyPage + 1}/${narrativeBeats.length}`}</small></div><article className="story-panel story-panel-paged">{previous && run.currentIndex > 0 && <p className="memory-echo">人物记得：{previous.memory}</p>}<p className="scene-count">{chapterLabel} · SCENE {sceneInChapter}</p><h1>{current.title}</h1><div className="beat-progress" aria-label="本幕阅读进度"><span>{showingDecision ? "做出选择" : "故事正在发生"}</span><div>{Array.from({ length: decisionPage + 1 }, (_, index) => <button aria-label={`前往第 ${index + 1} 页`} className={index === storyPage ? "active" : index < storyPage ? "read" : ""} disabled={index > storyPage} key={index} onClick={() => setStoryPage(index)} />)}</div><b>{storyPage + 1} / {decisionPage + 1}</b></div>{!resolvedChoice && <div className="story-reader" onTouchStart={(event) => { const touch = event.touches[0]; touchStartRef.current = { x: touch.clientX, y: touch.clientY }; }} onTouchEnd={(event) => { const start = touchStartRef.current; const touch = event.changedTouches[0]; if (!start || !touch) return; const dx = touch.clientX - start.x; const dy = touch.clientY - start.y; if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) nextStoryPage(); else previousStoryPage(); } touchStartRef.current = undefined; }}>
+    {!showingDecision && currentBeat && <section className="story-beat" key={`${current.id}-${storyPage}`}><p className="beat-number">{String(storyPage + 1).padStart(2, "0")}</p><div className="beat-copy">{currentBeat.text.split("\n\n").map((paragraph, index) => <p key={`${index}-${paragraph}`}>{paragraph}</p>)}</div></section>}
+    {showingDecision && !resolvedChoice && <section className="decision-page"><button className="decision-back" onClick={previousStoryPage}>← 回看上一页</button><p className="decision-kicker">故事走到这里</p><h2>{run.character.name}准备如何回应？</h2><div className="choices">{(current.choices ?? []).map((item, index) => <button onClick={() => choose(index)} key={item.id}><b>{String.fromCharCode(65 + index)}</b><span><strong>{item.label}</strong><small>{item.hint}</small></span><em>→</em></button>)}</div></section>}
+    {!showingDecision && <nav className="beat-navigation" aria-label="叙事翻页"><button disabled={storyPage === 0} onClick={previousStoryPage}>← 回看</button><span>可左右滑动翻页</span>{storyPage < decisionPage ? <button className="next" onClick={nextStoryPage}>{storyPage === lastNarrativePage && hasDecision ? "进入选择" : "继续"} →</button> : <i />}</nav>}
+  </div>}
+    {resolvedChoice && <section className="inline-outcome" id="choice-outcome"><p className="eyebrow">YOUR CHOICE · {resolvedChoice.label}</p><h2>选择之后，生活继续发生</h2><div className="outcome-progress"><span>结果 {outcomePage + 1} / {outcomeBeats.length}</span><div>{outcomeBeats.map((_, index) => <i className={index <= outcomePage ? "active" : ""} key={index} />)}</div></div><section className="story-beat outcome-beat" key={`${resolvedChoice.id}-${outcomePage}`}><div className="beat-copy">{outcomeBeats[outcomePage]?.text.split("\n\n").map((paragraph, index) => <p key={`${index}-${paragraph}`}>{paragraph}</p>)}</div></section><nav className="beat-navigation outcome-navigation" aria-label="选择结果翻页"><button disabled={outcomePage === 0} onClick={() => setOutcomePage((page) => Math.max(0, page - 1))}>← 回看</button><span>选择的影响正在发生</span>{outcomePage < lastOutcomePage ? <button className="next" onClick={() => setOutcomePage((page) => Math.min(lastOutcomePage, page + 1))}>继续 →</button> : <i />}</nav>{outcomeComplete && <div className="consequence-grid"><div><small>获得</small><p>{resolvedChoice.gain}</p></div><div><small>代价</small><p>{resolvedChoice.cost}</p></div><div><small>仍然未知</small><p>{resolvedChoice.unknown}</p></div></div>}</section>}
+    {journeyComplete && current.chapterEnd && (!hasDecision || resolvedChoice) && <section className="inline-coach"><p className="eyebrow">{chapterLabel} · LIFE COACH</p><h3>这一章，先在这里停一下</h3><p className="chapter-summary">以下五维只记录本章变化，不代表选择的好坏。</p><div className="delta-row">{Object.entries(chapterDeltas).filter(([, value]) => value).map(([key, value]) => <span key={key}><b>{statLabels[key]}</b><em className={(value || 0) > 0 ? "up" : "down"}>{(value || 0) > 0 ? "+" : ""}{value}</em></span>)}</div><div className="coach"><small>章末镜面 · 不替你决定</small><p>{current.coach}</p></div><small className="no-rank">Coach 从本章经历中提出问题，不提供标准答案。</small></section>}
     {continueError && <p className="continue-error">{continueError}</p>}
-    <button className="primary story-continue full" disabled={generating} onClick={continueStory}>{buttonLabel}</button></article></section>
+    {journeyComplete && (!hasDecision || resolvedChoice) && <button className="primary story-continue full" disabled={generating} onClick={continueStory}>{buttonLabel}</button>}</article></section>
   </main>;
 }
