@@ -2,6 +2,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { Portrait } from "@/components/Portrait";
 import { getPortrait } from "@/lib/portraits";
+import { buildCoachDigest } from "@/lib/coach-digest";
 import { getRun, saveRun } from "@/lib/store";
 import type { GameRun } from "@/lib/types";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type EndingProfile = { quotes: string[]; observations: { title: string; text: string }[] };
+type DynamicCoach = { observations: { title: string; text: string }[]; quote: string };
 
 const defaultProfile: EndingProfile = {
   quotes: [
@@ -119,16 +121,69 @@ function drawImageCover(ctx: CanvasRenderingContext2D, image: HTMLImageElement, 
 }
 
 export default function EndingPage() {
-  const id = String(useParams().runId); const [run, setRun] = useState<GameRun>(); const [quoteIndex, setQuoteIndex] = useState(0); const [saved, setSaved] = useState(false); const [cardFlipped, setCardFlipped] = useState(false);
-  useEffect(() => { const current = getRun(id); setRun(current); if (current?.cardQuote) { const found = resolveEndingProfile(current).quotes.indexOf(current.cardQuote); if (found >= 0) setQuoteIndex(found); setSaved(true); } }, [id]);
+  const id = String(useParams().runId);
+  const [run, setRun] = useState<GameRun>();
+  const [dynamic, setDynamic] = useState<DynamicCoach | null | undefined>(undefined);
+  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [saved, setSaved] = useState(false);
+  const [cardFlipped, setCardFlipped] = useState(false);
+
+  useEffect(() => {
+    const current = getRun(id);
+    setRun(current);
+    if (!current) return;
+    if (current.cardQuote) setSaved(true);
+    // 未走完全程，不请求动态 Coach
+    if (!current.finished) { setDynamic(null); return; }
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 15000);
+
+    (async () => {
+      try {
+        const digest = buildCoachDigest(current);
+        const res = await fetch(`/api/coach/${id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ digest }),
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`Coach API failed: ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setDynamic(data?.fallback === false && data?.result ? data.result : null);
+        }
+      } catch {
+        if (!cancelled) setDynamic(null);
+      } finally {
+        window.clearTimeout(timer);
+      }
+    })();
+
+    return () => { cancelled = true; window.clearTimeout(timer); controller.abort(); };
+  }, [id]);
+
   const observations = useMemo(() => {
     if (!run) return [];
+    if (dynamic?.observations?.length) return dynamic.observations;
     return resolveEndingProfile(run).observations;
-  }, [run]);
+  }, [run, dynamic]);
+
+  const quotes = useMemo(() => {
+    if (!run) return [];
+    const fallback = resolveEndingProfile(run).quotes;
+    const dq = dynamic?.quote;
+    return dq ? [dq, ...fallback.filter((q) => q !== dq)] : fallback;
+  }, [run, dynamic]);
+
+  useEffect(() => {
+    if (!run?.cardQuote || !quotes.length) return;
+    const idx = quotes.indexOf(run.cardQuote);
+    if (idx >= 0) setQuoteIndex(idx);
+  }, [run, quotes]);
   if (!run) return <main className="ending-page"><AppHeader compact /><section className="missing-journey"><p className="eyebrow">ROUTE NOT FOUND</p><h1>这条预览线路没有保存在当前浏览器里</h1><p>可能是链接编号有误，或游客存档已经更新。故事内容没有丢失，可以从图鉴打开已有线路，或者重新开始试玩。</p><div><Link href="/collection">打开我的图鉴</Link><Link href="/lobby#sample">重新开始试玩</Link></div></section></main>;
-  const profile = resolveEndingProfile(run);
-  const quotes = profile.quotes;
-  const quote = quotes[quoteIndex];
+  const quote = quotes[quoteIndex] ?? "这一条路，也留下了自己的答案。";
   const saveCard = () => { const next = { ...run, cardQuote: quote, cardSavedAt: Date.now() }; saveRun(next); setRun(next); setSaved(true); };
   const downloadCard = async () => {
     const canvas = document.createElement("canvas"); canvas.width = 1080; canvas.height = 1440; const ctx = canvas.getContext("2d"); if (!ctx) return;
