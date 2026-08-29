@@ -83,6 +83,10 @@ export type Preset = {
   situation: string;
   color: string;
   nodes: StoryNode[];
+  /** Systems data for preset runs that showcase affinity/locations/追忆往昔. */
+  plan?: StoryPlan;
+  cast?: CastMember[];
+  locations?: StoryLocation[];
 };
 
 export type CharacterCard = {

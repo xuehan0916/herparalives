@@ -2,6 +2,7 @@ import "server-only";
 import type { Preset, StatDelta, StoryChoice, StoryNode } from "@/lib/types";
 import type { StoryLibraryRecord } from "@/server/story-types";
 import { additionalStories } from "@/server/additional-stories";
+import { trialStory } from "@/server/trial-story";
 
 export type { StoryLibraryRecord } from "@/server/story-types";
 
@@ -165,7 +166,7 @@ const linCheStory: StoryLibraryRecord = {
   nodes,
 };
 
-export const presets: StoryLibraryRecord[] = [linCheStory, ...additionalStories];
+export const presets: StoryLibraryRecord[] = [trialStory, linCheStory, ...additionalStories];
 
 export const comingSoon: Array<{ name: string; note: string }> = [];
 

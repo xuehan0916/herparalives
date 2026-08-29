@@ -101,7 +101,10 @@ export default function PlayPage() {
     if (needsGeneration) return generating ? "正在生成下一章…" : continueError ? "重试生成下一章" : "生成下一章，继续故事";
     const seasonEnding = resolvedChoice
       ? Boolean(resolvedChoice.endsStory) || (!resolvedChoice.nextNodeId && run.currentIndex === nodes.length - 1)
-      : Boolean(current.chapterEnd && storyChapterCount >= (run.plan?.chapters ?? 0));
+      : // Pure-narration chapter-end: only the final chapter's ending shows the 回望 button.
+        // Using the current node's chapter (not storyChapterCount) keeps pre-loaded
+        // stories (built-in presets) from mislabeling mid-season chapter-ends.
+        Boolean(current.chapterEnd && current.chapter >= (run.plan?.chapters ?? 0));
     return seasonEnding ? "听听 Life Coach 的旅途回望" : current.chapterEnd ? "进入下一章" : "继续下一幕";
   })();
   const continueStory = async () => {
@@ -152,7 +155,7 @@ export default function PlayPage() {
     const nextIndex = nextNodeId ? nodes.findIndex((node) => node.id === nextNodeId) : -1;
     const finished = resolvedChoice
       ? Boolean(resolvedChoice.endsStory) || nextIndex < 0
-      : Boolean(current.chapterEnd && storyChapterCount >= (run.plan?.chapters ?? 0)) || nextIndex < 0;
+      : Boolean(current.chapterEnd && current.chapter >= (run.plan?.chapters ?? 0)) || nextIndex < 0;
     const visited = run.visitedNodeIds?.length ? run.visitedNodeIds : nodes.slice(0, run.currentIndex + 1).map((node) => node.id);
     const next = { ...run, currentIndex: finished ? run.currentIndex : nextIndex, currentNodeId: finished ? current.id : nextNodeId, visitedNodeIds: finished || !nextNodeId ? visited : [...visited.filter((nodeId) => nodeId !== nextNodeId), nextNodeId], finished, updatedAt: Date.now() };
     saveRun(next); setSelectedChoiceId(undefined); if (finished) router.push(`/ending/${run.id}`); else { setRun(next); scrollToTop(); }

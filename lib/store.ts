@@ -37,6 +37,7 @@ export function createPresetRun(preset: Preset) {
     id: crypto.randomUUID(), presetId: preset.id, story: preset.nodes, currentIndex: 0, currentNodeId: preset.nodes[0]?.id, visitedNodeIds: preset.nodes[0] ? [preset.nodes[0].id] : [], choices: [], branch: 1,
     createdAt: Date.now(), updatedAt: Date.now(), finished: false,
     character: { id: preset.id, name: preset.name, age: preset.age, portrait: preset.portrait, background: preset.situation, goal: preset.tagline, resources: ["已有生活经验", "仍可调动的人际支持"], dilemma: preset.situation, isCustom: false },
+    plan: preset.plan, cast: preset.cast, locations: preset.locations,
   };
   saveRun(run); return run;
 }
