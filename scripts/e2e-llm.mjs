@@ -122,7 +122,13 @@ async function main() {
     assert(dotCount === 5, `expected 5 chapter-progress dots, got ${dotCount}`);
     const activeDots = await page.$$eval(".chapter-progress i.active", (dots) => dots.length);
     assert(activeDots === 1, `expected 1 active dot, got ${activeDots}`);
-    log("play: CHAPTER 1 renders with 5-dot progress");
+    // Systems strip: 5 attribute bars render, cast chips present (mock cast from season fixture).
+    await page.waitForSelector(".systems-strip", { timeout: 10000 });
+    const statCount = await page.$$eval(".sys-stat", (els) => els.length);
+    assert(statCount === 5, `expected 5 attribute bars, got ${statCount}`);
+    const castChips = await page.$$eval(".sys-chips span", (els) => els.length);
+    assert(castChips >= 3, `expected cast affinity chips, got ${castChips}`);
+    log("play: CHAPTER 1 renders with 5-dot progress + systems strip");
 
     // ---- negative path: mock down BEFORE the chapter-1 final node renders ----
     // The play page prefetches the next chapter the moment the final node is
@@ -154,6 +160,21 @@ async function main() {
     await page.waitForFunction(() => document.querySelector(".scene-count")?.textContent?.includes("CHAPTER 2"), { timeout: 30000 });
     assert(chapterRequests >= 1, "no POST /api/chapters/generate captured");
     log(`retry OK → CHAPTER 2 (${chapterRequests} generation request(s))`);
+
+    // ---- map: systems dashboard + memory gate ----
+    log("map: systems dashboard");
+    await Promise.all([page.waitForFunction(() => location.pathname.startsWith("/map/")), page.click(".chapter-progress a")]);
+    await page.waitForSelector(".systems-dashboard", { timeout: 10000 });
+    const sdCards = await page.$$eval(".sd-card", (els) => els.length);
+    assert(sdCards === 6, `expected 6 system cards, got ${sdCards}`);
+    const lockedLocs = await page.$$eval(".sd-loc", (els) => els.filter((el) => !el.classList.contains("open")).length);
+    assert(lockedLocs >= 1, "expected at least one locked location");
+    // The mock run's affinity (陈姐 cast-a ~5) is below 信赖 → 追忆往昔 gate shows the reason.
+    const memHint = await page.$$eval(".sd-mem small", (els) => els.map((el) => el.textContent).join("|"));
+    assert(memHint.includes("信赖"), `expected 追忆 gate reason to mention 信赖, got "${memHint}"`);
+    log("map OK (6 cards, locked locations, memory gate)");
+    await page.click(".map-actions button");
+    await page.waitForFunction(() => location.pathname.startsWith("/play/"), { timeout: 10000 });
 
     // ---- chapters 2 → 5 ----
     for (const chapter of [2, 3, 4]) {

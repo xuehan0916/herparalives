@@ -1,6 +1,45 @@
-export type StatKey = "career" | "wisdom" | "happiness" | "relationship" | "courage";
+// The five display attributes. Deltas only ever grow these (0-100 cap); the cost
+// of a choice lives in its `cost` text, not in negative values. "wisdom" survives
+// as a legacy key purely so old preset story data still type-checks.
+export const STAT_KEYS = ["happiness", "intimacy", "career", "courage", "relationship"] as const;
+export type StatKey = (typeof STAT_KEYS)[number] | "wisdom";
 
 export type StatDelta = Partial<Record<StatKey, number>>;
+
+export type AffinityLevel = "stranger" | "acquainted" | "familiar" | "trusted" | "confidant";
+
+/** A named character the player builds affinity with — defined by the season prompt. */
+export type CastMember = { id: string; name: string; role: string; attribute: StatKey };
+
+/** Affinity gained toward a cast member by picking a choice. */
+export type StoryAffinity = { characterId: string; amount: number };
+
+/** A story fragment dropped by a key choice (剧情碎片). */
+export type StoryFragment = { name: string; text: string };
+
+export type FragmentType = "story" | "memory" | "fate";
+
+export type Fragment = { id: string; type: FragmentType; name: string; text: string; chapter: number; at: number };
+
+/** Location category = the attribute that unlocks it (温馨/社交/工作/探索). */
+export type LocationCategory = (typeof STAT_KEYS)[number];
+
+export type StoryLocation = {
+  id: string;
+  name: string;
+  category: LocationCategory;
+  /** Hidden/composite locations need more than the base category threshold. */
+  requires?: { characterId: string; affinityLevel: AffinityLevel };
+  extraAttrs?: Partial<Record<StatKey, number>>;
+  /** 终极场所: every attribute >= 70. */
+  ultimate?: boolean;
+};
+
+export type MemoryTier = "brief" | "full" | "deep" | "perfect";
+
+export type MemoryRecord = { tier: MemoryTier; text: string; at: number };
+
+export type AchievementId = "socialite" | "brave-heart" | "happy-one" | "career-peak" | "memory-keeper" | "explorer" | "bond-master";
 
 export type StoryChoice = {
   id: string;
@@ -14,6 +53,10 @@ export type StoryChoice = {
   memory: string;
   nextNodeId?: string;
   endsStory?: boolean;
+  /** Optional affinity gain toward one cast member. */
+  affinity?: StoryAffinity;
+  /** Optional story fragment this choice drops. */
+  fragment?: StoryFragment;
 };
 
 export type StoryNode = {
@@ -63,7 +106,7 @@ export type StoryPreferences = {
   realism: number;
 };
 
-export type StoryPlanItem = { chapter: number; title: string; synopsis: string };
+export type StoryPlanItem = { chapter: number; title: string; synopsis: string; characterId?: string };
 
 export type StoryPlan = { chapters: number; items: StoryPlanItem[] };
 
@@ -74,6 +117,10 @@ export type ChoiceRecord = {
   memory: string;
   deltas: StatDelta;
   at: number;
+  /** Chapter the node belonged to — lets the derived systems tag fragments. */
+  nodeChapter?: number;
+  affinity?: StoryAffinity;
+  fragment?: StoryFragment;
 };
 
 export type GameRun = {
@@ -92,4 +139,10 @@ export type GameRun = {
   finished: boolean;
   cardQuote?: string;
   cardSavedAt?: number;
+  /** Named characters from the season generation (affinity targets). */
+  cast?: CastMember[];
+  /** Location roster from the season generation (unlock state is derived). */
+  locations?: StoryLocation[];
+  /** Cached 追忆往昔 texts, keyed by chapter. */
+  memories?: Partial<Record<number, MemoryRecord>>;
 };

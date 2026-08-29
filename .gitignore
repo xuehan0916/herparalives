@@ -15,6 +15,7 @@ out/
 # TypeScript and test caches
 *.tsbuildinfo
 coverage/
+.test-dist/
 
 # Local IDE and OS files
 .vscode/

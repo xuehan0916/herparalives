@@ -2,13 +2,27 @@
 import { AppHeader } from "@/components/AppHeader";
 import { ScrollRevealText } from "@/components/ScrollRevealText";
 import { getRun, nodesForRun, saveRun } from "@/lib/store";
+import { computeSystems } from "@/lib/systems";
 import type { ChoiceRecord, GameRun, StatDelta, StoryNode } from "@/lib/types";
+import { STAT_KEYS } from "@/lib/types";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const statLabels: Record<string, string> = { career: "事业", wisdom: "智慧", happiness: "幸福", relationship: "关系", courage: "勇气" };
+const statMeta: Record<string, { icon: string; label: string }> = {
+  happiness: { icon: "💛", label: "幸福" },
+  intimacy: { icon: "🤝", label: "亲密" },
+  career: { icon: "💼", label: "事业" },
+  courage: { icon: "⚔️", label: "勇气" },
+  relationship: { icon: "🌐", label: "关系" },
+  wisdom: { icon: "📚", label: "智慧" }, // legacy preset runs only
+};
+const FRAGMENT_META: Record<string, { icon: string; label: string }> = {
+  story: { icon: "📖", label: "剧情" },
+  memory: { icon: "💫", label: "回忆" },
+  fate: { icon: "🔮", label: "命运" },
+};
 const sumChapter = (records: ChoiceRecord[]) => records.reduce<StatDelta>((sum, record) => { Object.entries(record.deltas).forEach(([key, value]) => { const stat = key as keyof StatDelta; sum[stat] = (sum[stat] || 0) + (value || 0); }); return sum; }, {});
 // iOS Safari cancels smooth programmatic scrolling when the layout changes in the same frame (e.g. a new chapter rendering), so jump instantly there and scroll smoothly elsewhere.
 const iosDevice = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -27,6 +41,7 @@ export default function PlayPage() {
   const lastIndexRef = useRef(0);
   useEffect(() => setRun(getRun(id)), [id]);
   const nodes = useMemo(() => run ? nodesForRun(run) : [], [run]); const current = run ? (nodes.find((node) => node.id === run.currentNodeId) ?? nodes[run.currentIndex]) : undefined;
+  const systems = useMemo(() => (run ? computeSystems(run) : null), [run]);
   useEffect(() => {
     if (!run?.plan || !current) return;
     // Rewinding to an earlier node invalidates a prefetch built on the old choices.
@@ -65,7 +80,7 @@ export default function PlayPage() {
     if (resolvedChoice) return;
     const selected = current.choices?.[choiceIndex];
     if (!selected) return;
-    const record: ChoiceRecord = { nodeId: current.id, choiceId: selected.id, choiceLabel: selected.label, memory: selected.memory, deltas: selected.deltas, at: Date.now() };
+    const record: ChoiceRecord = { nodeId: current.id, choiceId: selected.id, choiceLabel: selected.label, memory: selected.memory, deltas: selected.deltas, affinity: selected.affinity, fragment: selected.fragment, nodeChapter: current.chapter, at: Date.now() };
     const withChoice = { ...run, choices: [...run.choices, record], updatedAt: Date.now() };
     saveRun(withChoice); setRun(withChoice); setSelectedChoiceId(selected.id);
     window.setTimeout(() => { const el = document.getElementById("choice-outcome"); if (el) { if (iosDevice()) el.scrollIntoView(); else el.scrollIntoView({ behavior: "smooth", block: "start" }); } }, 50);
@@ -151,9 +166,9 @@ export default function PlayPage() {
   const hasPrologue = run.presetId === "test-story";
   const chapterLabel = hasPrologue && current.chapter === 1 ? "PROLOGUE" : `CHAPTER ${hasPrologue ? current.chapter - 1 : current.chapter}`;
   const chapterDeltas = sumChapter(run.choices.filter((item) => nodes.find((storyNode) => storyNode.id === item.nodeId)?.chapter === current.chapter));
-  return <main className="play-page"><AppHeader compact /><div className="chapter-progress"><span>{current.chapterTitle} · 第 {sceneInChapter} 幕</span><div>{chapterNumbers.map((chapter) => <i className={chapter <= current.chapter ? "active" : ""} key={chapter} />)}</div><Link href={`/map/${run.id}`}>查看人生地图</Link></div><section className="story-stage"><div className="scene-art illustrated"><Image src={current.illustration || "/images/linan-ch1-v1.png"} alt={`${current.title}手绘剧情场景`} fill priority sizes="(max-width: 760px) 100vw, 52vw" /><div className="scene-vignette" /><small>关键场景 · 手绘叙事插画</small></div><article className="story-panel">{previous && run.currentIndex > 0 && <p className="memory-echo">人物记得：{previous.memory}</p>}<p className="scene-count">{chapterLabel} · SCENE {sceneInChapter}</p><h1>{current.title}</h1><ScrollRevealText className="scene-text rich-scene" text={current.scene} />{current.dialogue && <blockquote>{current.dialogue}</blockquote>}{!resolvedChoice && (current.choices?.length ?? 0) > 0 && <div className="choices"><p>故事走到这里，{run.character.name}准备如何回应？</p>{(current.choices ?? []).map((item, index) => <button onClick={() => choose(index)} key={item.id}><b>{String.fromCharCode(65 + index)}</b><span><strong>{item.label}</strong><small>{item.hint}</small></span><em>→</em></button>)}</div>}
-    {resolvedChoice && <section className="inline-outcome" id="choice-outcome"><p className="eyebrow">YOUR CHOICE · {resolvedChoice.label}</p><h2>选择之后，生活继续发生</h2><ScrollRevealText className="outcome-story" text={resolvedChoice.outcome} /><div className="consequence-grid"><div><small>获得</small><p>{resolvedChoice.gain}</p></div><div><small>代价</small><p>{resolvedChoice.cost}</p></div><div><small>仍然未知</small><p>{resolvedChoice.unknown}</p></div></div></section>}
-    {current.chapterEnd && <section className="inline-coach"><p className="eyebrow">{chapterLabel} · LIFE COACH</p><h3>这一章，先在这里停一下</h3><p className="chapter-summary">以下五维只记录本章变化，不代表选择的好坏。</p><div className="delta-row">{Object.entries(chapterDeltas).filter(([, value]) => value).map(([key, value]) => <span key={key}><b>{statLabels[key]}</b><em className={(value || 0) > 0 ? "up" : "down"}>{(value || 0) > 0 ? "+" : ""}{value}</em></span>)}</div><div className="coach"><small>章末镜面 · 不替你决定</small><p>{current.coach}</p></div><small className="no-rank">Coach 从本章经历中提出问题，不提供标准答案。</small></section>}
+  return <main className="play-page"><AppHeader compact /><div className="chapter-progress"><span>{current.chapterTitle} · 第 {sceneInChapter} 幕</span><div>{chapterNumbers.map((chapter) => <i className={chapter <= current.chapter ? "active" : ""} key={chapter} />)}</div><Link href={`/map/${run.id}`}>查看人生地图</Link></div>{systems && <div className="systems-strip"><div className="sys-stats">{STAT_KEYS.map((key) => { const value = systems.attributes[key] ?? 0; return <div className="sys-stat" key={key}><span>{statMeta[key].icon} {statMeta[key].label}</span><div className="sys-bar"><i style={{ width: `${Math.min(100, value)}%` }} /></div><em>{value}</em></div>; })}</div>{(run.cast?.length ?? 0) > 0 && <div className="sys-chips">{run.cast?.map((member) => { const entry = systems.affinity[member.id]; return <span key={member.id} className={entry && entry.value >= 60 ? "trusted" : ""}>{member.name} · {entry ? entry.label : "陌生"}</span>; })}</div>}{systems.fragments.length > 0 && <div className="sys-chips">{Object.entries(FRAGMENT_META).map(([type, meta]) => { const count = systems.fragments.filter((f) => f.type === type).length; return count > 0 ? <span key={type}>{meta.icon} {meta.label} × {count}</span> : null; })}</div>}</div>}<section className="story-stage"><div className="scene-art illustrated"><Image src={current.illustration || "/images/linan-ch1-v1.png"} alt={`${current.title}手绘剧情场景`} fill priority sizes="(max-width: 760px) 100vw, 52vw" /><div className="scene-vignette" /><small>关键场景 · 手绘叙事插画</small></div><article className="story-panel">{previous && run.currentIndex > 0 && <p className="memory-echo">人物记得：{previous.memory}</p>}<p className="scene-count">{chapterLabel} · SCENE {sceneInChapter}</p><h1>{current.title}</h1><ScrollRevealText className="scene-text rich-scene" text={current.scene} />{current.dialogue && <blockquote>{current.dialogue}</blockquote>}{!resolvedChoice && (current.choices?.length ?? 0) > 0 && <div className="choices"><p>故事走到这里，{run.character.name}准备如何回应？</p>{(current.choices ?? []).map((item, index) => <button onClick={() => choose(index)} key={item.id}><b>{String.fromCharCode(65 + index)}</b><span><strong>{item.label}</strong><small>{item.hint}</small></span><em>→</em></button>)}</div>}
+    {resolvedChoice && <section className="inline-outcome" id="choice-outcome"><p className="eyebrow">YOUR CHOICE · {resolvedChoice.label}</p><h2>选择之后，生活继续发生</h2><ScrollRevealText className="outcome-story" text={resolvedChoice.outcome} />{((resolvedChoice.affinity && (run.cast?.length ?? 0) > 0) || resolvedChoice.fragment) && <div className="gains-row">{resolvedChoice.affinity && <span>🤝 {run.cast?.find((member) => member.id === resolvedChoice.affinity?.characterId)?.name ?? "她"} 好感 +{resolvedChoice.affinity.amount}</span>}{resolvedChoice.fragment && <span>📖 剧情碎片「{resolvedChoice.fragment.name}」</span>}</div>}<div className="consequence-grid"><div><small>获得</small><p>{resolvedChoice.gain}</p></div><div><small>代价</small><p>{resolvedChoice.cost}</p></div><div><small>仍然未知</small><p>{resolvedChoice.unknown}</p></div></div></section>}
+    {current.chapterEnd && <section className="inline-coach"><p className="eyebrow">{chapterLabel} · LIFE COACH</p><h3>这一章，先在这里停一下</h3><p className="chapter-summary">以下五维只记录本章变化，不代表选择的好坏。</p><div className="delta-row">{Object.entries(chapterDeltas).filter(([, value]) => value).map(([key, value]) => <span key={key}><b>{statMeta[key]?.label ?? key}</b><em className={(value || 0) > 0 ? "up" : "down"}>{(value || 0) > 0 ? "+" : ""}{value}</em></span>)}</div><div className="coach"><small>章末镜面 · 不替你决定</small><p>{current.coach}</p></div><small className="no-rank">Coach 从本章经历中提出问题，不提供标准答案。</small></section>}
     {continueError && <p className="continue-error">{continueError}</p>}
     <button className="primary story-continue full" disabled={generating} onClick={continueStory}>{buttonLabel}</button></article></section>
   </main>;

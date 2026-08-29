@@ -2,8 +2,16 @@
 import { AppHeader } from "@/components/AppHeader";
 import { Portrait } from "@/components/Portrait";
 import { getPortrait } from "@/lib/portraits";
+import { ACHIEVEMENT_META, computeSystems } from "@/lib/systems";
 import { getRun, saveRun } from "@/lib/store";
 import type { GameRun } from "@/lib/types";
+import { STAT_KEYS } from "@/lib/types";
+
+const statMeta: Record<string, { icon: string; label: string }> = {
+  happiness: { icon: "💛", label: "幸福" }, intimacy: { icon: "🤝", label: "亲密" },
+  career: { icon: "💼", label: "事业" }, courage: { icon: "⚔️", label: "勇气" },
+  relationship: { icon: "🌐", label: "关系" }, wisdom: { icon: "📚", label: "智慧" },
+};
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -116,6 +124,7 @@ export default function EndingPage() {
     if (!run) return [];
     return resolveEndingProfile(run).observations;
   }, [run]);
+  const systems = useMemo(() => (run ? computeSystems(run) : null), [run]);
   if (!run) return <main className="ending-page"><AppHeader compact /><section className="missing-journey"><p className="eyebrow">ROUTE NOT FOUND</p><h1>这条预览线路没有保存在当前浏览器里</h1><p>可能是链接编号有误，或游客存档已经更新。故事内容没有丢失，可以从图鉴打开已有线路，或者重新开始试玩。</p><div><Link href="/collection">打开我的图鉴</Link><Link href="/lobby#sample">重新开始试玩</Link></div></section></main>;
   const profile = resolveEndingProfile(run);
   const quotes = profile.quotes;
@@ -132,7 +141,7 @@ export default function EndingPage() {
     const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.download = `${run.character.name}-平行人生卡.png`; link.href = url; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <main className="ending-page"><AppHeader compact /><section className="ending-wrap"><header className="reflection-hero"><p className="eyebrow">A PLACE TO LOOK BACK</p><h1>这条路走到了一个<br />可以回望的站台</h1><p>不是终点，也不是对你的定义。Life Coach 只是把这一路反复出现的选择，重新放到你面前。</p></header>
-    <article className="coach-reflection"><p className="eyebrow dark">LIFE COACH · 旅途回望</p><h2>{run.character.name}，我从你的选择里看见了这些</h2><div className="observation-grid">{observations.map((item, index) => <section key={item.title}><span>0{index + 1}</span><h3>{item.title}</h3><p>{item.text}</p></section>)}</div><div className="choice-ribbon"><small>你在这条线路留下的脚印</small><p>{run.choices.map((item) => item.choiceLabel).join(" · ")}</p></div></article>
+    <article className="coach-reflection"><p className="eyebrow dark">LIFE COACH · 旅途回望</p><h2>{run.character.name}，我从你的选择里看见了这些</h2><div className="observation-grid">{observations.map((item, index) => <section key={item.title}><span>0{index + 1}</span><h3>{item.title}</h3><p>{item.text}</p></section>)}</div>{systems && <div className="ending-systems"><div className="ending-stats">{STAT_KEYS.map((key) => <span key={key}>{statMeta[key].icon} {statMeta[key].label} <b>{systems.attributes[key] ?? 0}</b></span>)}</div>{systems.achievements.length > 0 && <small>沿途解锁：{systems.achievements.map((id) => ACHIEVEMENT_META[id as keyof typeof ACHIEVEMENT_META]?.name ?? id).join(" · ")}</small>}</div>}<div className="choice-ribbon"><small>你在这条线路留下的脚印</small><p>{run.choices.map((item) => item.choiceLabel).join(" · ")}</p></div></article>
     <section className="share-studio"><div className="share-copy"><p className="eyebrow dark">MAKE IT YOURS</p><h2>选一句想带走的话</h2><p>这句话不是结论。它只是此刻最想留在你身边的那句提醒。</p><div className="share-controls"><button onClick={() => { setQuoteIndex((quoteIndex + 1) % quotes.length); setSaved(false); }}>换一句</button><button onClick={saveCard}>{saved ? "已保存到图鉴" : "保存到我的图鉴"}</button><button onClick={downloadCard}>下载卡片</button></div></div><div className="journey-card"><div className="journey-card-copy"><small>她的平行人生 · LIFE COACH</small><blockquote>“{quote}”</blockquote><p>{run.character.name}走过的一条平行线路</p></div><Portrait id={run.character.portrait} /></div></section>
     <div className="ending-actions"><Link href={`/map/${id}`}>展开人生地图</Link><Link href="/lobby#sample">再走一条平行线路</Link><Link href="/collection">打开我的图鉴</Link></div></section></main>;
 }

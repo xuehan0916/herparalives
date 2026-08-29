@@ -250,3 +250,64 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 
 @media(max-width:760px){.branch-map{padding:8px 14px 45px}.branch-map::before{left:36px}.route-stage{margin-left:12px;padding:18px}.route-stage>header{grid-template-columns:40px 1fr}.route-stage>header>button{grid-column:2;justify-self:start}.route-fan{grid-template-columns:1fr;padding:16px 0 0 24px}.route-fan::before{top:0;bottom:14%;left:0;right:auto;width:24px;height:auto;border-top:2px solid rgba(118,92,152,.24);border-left:2px solid rgba(118,92,152,.24);border-right:0;border-bottom:2px solid rgba(118,92,152,.24)}.route-option::before{top:50%;left:-25px;width:25px;height:2px}.coach-reflection,.share-studio{padding:28px 18px}.observation-grid{grid-template-columns:1fr}.observation-grid section{min-height:0}.share-studio{grid-template-columns:1fr}.journey-card{order:-1}.reflection-hero{padding:30px 10px 40px}}
 @media(max-width:760px){.play-mode-head{padding:45px 0 36px}.play-mode-wrap{padding:0 20px}.play-mode-grid{grid-template-columns:1fr}.play-mode-grid p{min-height:0}.portrait-picker{grid-template-columns:repeat(3,1fr)}.library-card{grid-template-columns:1fr;min-height:0}.library-card>div{height:360px}.library-card section{padding:30px 24px}.library-card h3{font-size:34px}}
+
+/* Derived game systems — attributes, affinity, fragments, locations, achievements */
+.sys-bar { position: relative; height: 4px; overflow: hidden; border-radius: 999px; background: rgba(127,127,153,.25); }
+.sys-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: linear-gradient(90deg,#d9a39b,#a78bc0); }
+.systems-strip { padding: 10px 5vw; border-bottom: 1px solid rgba(255,255,255,.09); background: rgba(15,15,30,.55); }
+.sys-stats { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; }
+.sys-stat { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; }
+.sys-stat span { color: rgba(255,255,255,.78); font-size: 10px; }
+.sys-stat .sys-bar { grid-column: 1; }
+.sys-stat em { color: #e6b0a6; font-size: 11px; font-style: normal; font-weight: 800; grid-column: 2; grid-row: 1/3; }
+.sys-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.sys-chips span { padding: 4px 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; color: rgba(255,255,255,.6); font-size: 9px; }
+.sys-chips span.trusted { border-color: #e0a79c; color: #f0c1b8; }
+.gains-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.gains-row span { padding: 7px 12px; border-radius: 999px; color: #7d5c91; background: #f1e7f0; font-size: 11px; font-weight: 700; }
+
+.systems-dashboard { max-width: 1080px; margin: 0 auto; padding: 10px 30px 0; }
+.sd-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.sd-card { padding: 20px; border: 1px solid rgba(118,92,152,.16); border-radius: 20px; background: rgba(255,255,255,.86); box-shadow: 0 12px 32px rgba(62,48,72,.06); }
+.sd-card h3 { margin: 0 0 14px; font-family: Georgia,"Songti SC",serif; font-size: 17px; font-weight: 400; }
+.sd-stats { display: grid; gap: 9px; }
+.sd-stat { display: grid; grid-template-columns: 76px 1fr 32px; gap: 8px; align-items: center; }
+.sd-stat span { color: var(--muted); font-size: 11px; }
+.sd-stat em { color: var(--purple); font-size: 12px; font-style: normal; font-weight: 800; text-align: right; }
+.sd-affinity { display: grid; gap: 10px; }
+.sd-aff { display: grid; grid-template-columns: 1fr 36px; gap: 3px 8px; align-items: center; }
+.sd-aff span { font-size: 12px; font-weight: 700; }
+.sd-aff span small { display: block; color: var(--muted); font-weight: 400; }
+.sd-aff em { color: var(--purple); font-size: 10px; font-style: normal; text-align: right; }
+.sd-fragments { display: grid; gap: 8px; }
+.sd-frag { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 12px; background: #f3eef3; }
+.sd-frag b { flex: 1; font-size: 11px; }
+.sd-frag em { color: var(--purple); font-size: 11px; font-style: normal; font-weight: 800; }
+.sd-frag.has { background: #ede3ef; }
+.sd-fragments small { color: var(--muted); font-size: 10px; line-height: 1.6; }
+.sd-locations { display: grid; gap: 7px; }
+.sd-loc { display: flex; justify-content: space-between; gap: 8px; padding: 9px 11px; border-radius: 10px; color: var(--muted); background: #f6f2f5; }
+.sd-loc span { font-size: 11px; }
+.sd-loc small { color: var(--purple); font-size: 9px; }
+.sd-loc.open { color: var(--ink); background: #eae1ec; }
+.sd-loc.open small { color: #4f8b68; }
+.sd-achievements { display: grid; gap: 7px; }
+.sd-ach { padding: 9px 11px; border-radius: 10px; color: var(--muted); background: #f6f2f5; }
+.sd-ach b { display: block; font-size: 11px; }
+.sd-ach small { color: var(--muted); font-size: 9px; }
+.sd-ach.earned { color: var(--ink); background: #eae1ec; }
+.sd-ach.earned b { color: #7d5c91; }
+.sd-memories { display: grid; gap: 8px; }
+.sd-mem { padding: 11px 13px; border-radius: 12px; background: #f6f2f5; }
+.sd-mem > span { display: block; font-size: 11px; font-weight: 700; }
+.sd-mem small { display: block; margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.sd-mem button { margin-top: 8px; padding: 8px 13px; border: 1px solid var(--purple); border-radius: 999px; color: var(--purple); background: transparent; font-size: 10px; font-weight: 800; }
+.sd-mem blockquote { margin: 7px 0 0; padding: 11px 13px; border-left: 2px solid var(--coral); color: var(--ink); background: white; font-family: Georgia,"Songti SC",serif; font-size: 12px; line-height: 1.8; }
+
+.ending-systems { margin: 26px 0 0; }
+.ending-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.ending-stats span { padding: 8px 12px; border-radius: 999px; color: var(--purple); background: #ede5ee; font-size: 11px; }
+.ending-stats b { color: var(--ink); }
+.ending-systems > small { display: block; margin-top: 10px; color: var(--muted); font-size: 11px; }
+
+@media(max-width:760px){.systems-strip{padding:9px 18px}.sys-stats{gap:6px}.sys-stat span{font-size:9px}.sys-stat{grid-template-columns:1fr auto}.sd-grid{grid-template-columns:1fr}.systems-dashboard{padding:8px 14px 0}.sd-stat{grid-template-columns:64px 1fr 30px}}
