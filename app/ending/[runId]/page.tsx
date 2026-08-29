@@ -2,11 +2,14 @@
 import { AppHeader } from "@/components/AppHeader";
 import { Portrait } from "@/components/Portrait";
 import { getPortrait } from "@/lib/portraits";
+import { buildCoachDigest } from "@/lib/coach-digest";
 import { getRun, saveRun } from "@/lib/store";
 import type { GameRun } from "@/lib/types";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+
+type DynamicCoach = { observations: { title: string; text: string }[]; quote: string };
 
 type EndingProfile = { quotes: string[]; observations: { title: string; text: string }[] };
 
@@ -19,7 +22,7 @@ const defaultProfile: EndingProfile = {
   ],
   observations: [
     { title: "我注意到的节奏", text: "面对不确定时，你会先选择一条可以恢复秩序的路。确定感对你很重要，但它并没有让其他可能性失去价值。" },
-    { title: "反复出现的张力", text: "你既珍惜关系与承诺，也不愿把决定权交出去。你做的许多选择，都在尝试让支持、稳定和自主不必互相排斥。" },
+    { title: "出现的张力", text: "你既珍惜关系与承诺，也不愿把决定权交出去。你做的许多选择，都在尝试让支持、稳定和自主不必互相排斥。" },
     { title: "还可以带着走的问题", text: "下一次你又想用“再多做一点”换取安心时，怎样分辨这是你真心选择的投入，还是焦虑正在替你安排生活？" },
   ],
 };
@@ -35,7 +38,7 @@ const endingProfiles: Record<string, EndingProfile> = {
     ],
     observations: [
       { title: "我注意到的节奏", text: "面对重新开始，你倾向于先保留可能，再用行动换取判断依据。这为你留下了空间，也让你承担了双份责任。" },
-      { title: "反复出现的张力", text: "你既珍惜稳定与承诺，也不愿把决定权交出去。你的许多选择，都在试着让支持、稳定和自主不必互相排斥。" },
+      { title: "出现的张力", text: "你既珍惜稳定与承诺，也不愿把决定权交出去。你的许多选择，都在试着让支持、稳定和自主不必互相排斥。" },
       { title: "还可以带着走的问题", text: "下一次你又想用“再多做一点”换取安心时，怎样分辨这是真心投入，还是焦虑在替你安排生活？" },
     ],
   },
@@ -49,7 +52,7 @@ const endingProfiles: Record<string, EndingProfile> = {
     ],
     observations: [
       { title: "我注意到的节奏", text: "你把自己的身体和恢复当成正式的目标，而不是职业的附属品。当停下时，你没有急着用“做点什么”来消除不安。" },
-      { title: "反复出现的张力", text: "你在“守住边界”和“保障现金流”之间反复权衡，也看见透支的感觉总以更体面的名字回来。" },
+      { title: "出现的张力", text: "你在“守住边界”和“保障现金流”之间反复权衡，也看见透支的感觉总以更体面的名字回来。" },
       { title: "还可以带着走的问题", text: "当身体又一次发紧、失眠、胃痛时，你能不能把它听成信号，而不是继续用忙碌把它压过去？" },
     ],
   },
@@ -63,7 +66,7 @@ const endingProfiles: Record<string, EndingProfile> = {
     ],
     observations: [
       { title: "我注意到的节奏", text: "你在靠近与后退之间反复校准距离。每一次微小的回应或后退，都在重新定义你能接受怎样的亲密。" },
-      { title: "反复出现的张力", text: "你习惯先评估再靠近——评估保护过你，也让你很难允许自己在关系里不完全确定。" },
+      { title: "出现的张力", text: "你习惯先评估再靠近——评估保护过你，也让你很难允许自己在关系里不完全确定。" },
       { title: "还可以带着走的问题", text: "下一次你想后退半步时，先问问自己：我是真的想离开，还是只是害怕靠近？" },
     ],
   },
@@ -77,7 +80,7 @@ const endingProfiles: Record<string, EndingProfile> = {
     ],
     observations: [
       { title: "我注意到的节奏", text: "你把抽象的城市选择，拆成了谁付出、谁承担、什么时候复盘的账目。你很少把爱当成一道一劳永逸的答案。" },
-      { title: "反复出现的张力", text: "你在职业方向和共同生活之间反复权衡，也一次次看清：迁移的成本从来不是平均分配的。" },
+      { title: "出现的张力", text: "你在职业方向和共同生活之间反复权衡，也一次次看清：迁移的成本从来不是平均分配的。" },
       { title: "还可以带着走的问题", text: "当迁移的代价又一次落到某个人身上时，你会把它摊到桌面上，还是继续默认那个“更灵活”的人承担？" },
     ],
   },
@@ -91,7 +94,7 @@ const endingProfiles: Record<string, EndingProfile> = {
     ],
     observations: [
       { title: "我注意到的节奏", text: "你不把深造当成勇敢测试，而是一次需要目标、预算和退出条件的投资。做决定前，你总要先拿到一份证据。" },
-      { title: "反复出现的张力", text: "你在“系统学习”和“职场实践”之间反复权衡，也在算清哪一条路能让真正的成长落地。" },
+      { title: "出现的张力", text: "你在“系统学习”和“职场实践”之间反复权衡，也在算清哪一条路能让真正的成长落地。" },
       { title: "还可以带着走的问题", text: "当坚持变成硬扛时，你是依据数据调整方向，还是被“已经投入这么多”困住？" },
     ],
   },
@@ -111,15 +114,33 @@ function drawWrappedText(ctx: CanvasRenderingContext2D, text: string, x: number,
 
 export default function EndingPage() {
   const id = String(useParams().runId); const [run, setRun] = useState<GameRun>(); const [quoteIndex, setQuoteIndex] = useState(0); const [saved, setSaved] = useState(false);
-  useEffect(() => { const current = getRun(id); setRun(current); if (current?.cardQuote) { const found = resolveEndingProfile(current).quotes.indexOf(current.cardQuote); if (found >= 0) setQuoteIndex(found); setSaved(true); } }, [id]);
+  const [dynamic, setDynamic] = useState<DynamicCoach | null | undefined>(undefined);
+  useEffect(() => {
+    const current = getRun(id); setRun(current);
+    if (!current) return;
+    if (current?.cardQuote) { const found = resolveEndingProfile(current).quotes.indexOf(current.cardQuote); if (found >= 0) setQuoteIndex(found); setSaved(true); }
+    if (!current.finished) { setDynamic(null); return; }
+    let cancelled = false;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 15000);
+    (async () => {
+      try {
+        const res = await fetch(`/api/coach/${current.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ digest: buildCoachDigest(current) }), signal: controller.signal });
+        const data = await res.json();
+        if (!cancelled) setDynamic(data && data.fallback === false && data.result ? data.result : null);
+      } catch { if (!cancelled) setDynamic(null); }
+    })();
+    return () => { cancelled = true; window.clearTimeout(timer); controller.abort(); };
+  }, [id]);
   const observations = useMemo(() => {
     if (!run) return [];
+    if (dynamic) return dynamic.observations;
     return resolveEndingProfile(run).observations;
-  }, [run]);
+  }, [run, dynamic]);
   if (!run) return <main className="ending-page"><AppHeader compact /><section className="missing-journey"><p className="eyebrow">ROUTE NOT FOUND</p><h1>这条预览线路没有保存在当前浏览器里</h1><p>可能是链接编号有误，或游客存档已经更新。故事内容没有丢失，可以从图鉴打开已有线路，或者重新开始试玩。</p><div><Link href="/collection">打开我的图鉴</Link><Link href="/lobby#sample">重新开始试玩</Link></div></section></main>;
   const profile = resolveEndingProfile(run);
-  const quotes = profile.quotes;
-  const quote = quotes[quoteIndex];
+  const quotes = dynamic ? [...new Set([dynamic.quote, ...profile.quotes])] : profile.quotes;
+  const quote = quotes[quoteIndex] ?? quotes[0];
   const saveCard = () => { const next = { ...run, cardQuote: quote, cardSavedAt: Date.now() }; saveRun(next); setRun(next); setSaved(true); };
   const downloadCard = async () => {
     const canvas = document.createElement("canvas"); canvas.width = 1080; canvas.height = 1440; const ctx = canvas.getContext("2d"); if (!ctx) return;
@@ -132,7 +153,7 @@ export default function EndingPage() {
     const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.download = `${run.character.name}-平行人生卡.png`; link.href = url; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   return <main className="ending-page"><AppHeader compact /><section className="ending-wrap"><header className="reflection-hero"><p className="eyebrow">A PLACE TO LOOK BACK</p><h1>这条路走到了一个<br />可以回望的站台</h1><p>不是终点，也不是对你的定义。Life Coach 只是把这一路反复出现的选择，重新放到你面前。</p></header>
-    <article className="coach-reflection"><p className="eyebrow dark">LIFE COACH · 旅途回望</p><h2>{run.character.name}，我从你的选择里看见了这些</h2><div className="observation-grid">{observations.map((item, index) => <section key={item.title}><span>0{index + 1}</span><h3>{item.title}</h3><p>{item.text}</p></section>)}</div><div className="choice-ribbon"><small>你在这条线路留下的脚印</small><p>{run.choices.map((item) => item.choiceLabel).join(" · ")}</p></div></article>
+    <article className="coach-reflection"><p className="eyebrow dark">LIFE COACH · 旅途回望</p><h2>{run.character.name}，我从你的选择里看见了这些</h2>{dynamic === undefined && !run.choices.length ? null : (dynamic === undefined && <p className="coach-loading">Coach 正在回望这一路的选择…</p>)}<div className="observation-grid">{observations.map((item, index) => <section key={item.title}><span>0{index + 1}</span><h3>{item.title}</h3><p>{item.text}</p></section>)}</div><div className="choice-ribbon"><small>你在这条线路留下的脚印</small><p>{run.choices.map((item) => item.choiceLabel).join(" · ")}</p></div>{dynamic === null && run.choices.length ? <small className="no-rank">Coach 未能接入实时分析，以上为程式化回望；不影响你的存档。</small> : null}</article>
     <section className="share-studio"><div className="share-copy"><p className="eyebrow dark">MAKE IT YOURS</p><h2>选一句想带走的话</h2><p>这句话不是结论。它只是此刻最想留在你身边的那句提醒。</p><div className="share-controls"><button onClick={() => { setQuoteIndex((quoteIndex + 1) % quotes.length); setSaved(false); }}>换一句</button><button onClick={saveCard}>{saved ? "已保存到图鉴" : "保存到我的图鉴"}</button><button onClick={downloadCard}>下载卡片</button></div></div><div className="journey-card"><div className="journey-card-copy"><small>她的平行人生 · LIFE COACH</small><blockquote>“{quote}”</blockquote><p>{run.character.name}走过的一条平行线路</p></div><Portrait id={run.character.portrait} /></div></section>
     <div className="ending-actions"><Link href={`/map/${id}`}>展开人生地图</Link><Link href="/lobby#sample">再走一条平行线路</Link><Link href="/collection">打开我的图鉴</Link></div></section></main>;
 }
