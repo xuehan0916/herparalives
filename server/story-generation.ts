@@ -40,7 +40,9 @@ function normalizeDeltas(value: unknown): unknown {
       if (raw === null || raw === undefined || raw === "") return [];
       const parsed = typeof raw === "number" ? raw : Number(raw);
       if (!Number.isFinite(parsed)) return [];
-      return [[key, Math.max(-3, Math.min(3, Math.round(parsed)))]];
+      // Attributes only grow (0-3): a negative from the model clamps to no-op,
+      // the cost of a choice lives in its `cost` text, never a negative delta.
+      return [[key, Math.max(0, Math.min(3, Math.round(parsed)))]];
     }),
   );
 }
@@ -52,7 +54,7 @@ const nullable = <T extends z.ZodType>(schema: T) =>
 const deltasSchema = z
   .preprocess(
     normalizeDeltas,
-    z.partialRecord(z.enum(STAT_KEYS), z.number().int().min(-3).max(3)),
+    z.partialRecord(z.enum(STAT_KEYS), z.number().int().min(0).max(3)),
   )
   .default(EMPTY_DELTAS);
 
@@ -251,8 +253,13 @@ const EXAMPLE_NODE = `{
         "gain": "（选择后可能获得的东西，4—48字）",
         "cost": "（选择后需要付出的代价，4—48字）",
         "unknown": "（未说破的不确定因素，4—48字）",
+<<<<<<< HEAD
         "outcome": "（选后剧情：140—260字完整故事，拆成3—5个短自然段，每段不超过90字，JSON字符串用\\n\\n分段，写清行动、回应、代价与下一幕悬念，禁止一两句带过）",
         "deltas": { "career": 1, "happiness": -1 },
+=======
+        "outcome": "（选后剧情：180—450字、2—3个自然段的完整故事，JSON字符串用\\n\\n分段，写清行动、回应、代价与下一幕悬念，禁止一两句带过）",
+        "deltas": { "career": 1, "happiness": 2 },
+>>>>>>> ddadf96 (fix: choices give only positive attribute changes (deltas 0-3); gains displays clamp)
         "memory": "（这一选择值得被记住的一句话，4—60字）",
         "effects": [
           { "domain": "career", "from": "（选择前职业状态）", "to": "（选择后职业状态）", "consequence": "（后续可被场景明确呈现的职业后果）" },
@@ -298,7 +305,7 @@ const SEASON_TASK = [
   `【五次选择路径】第一章是“本能与核心冲突”：选项要让玩家第一次暴露她更想保护什么。整季后续依次走向边界表达、代价落地、受挫修正和现实承诺；五章不能重复询问同一个问题。`,
   `【选项中立】每个选项都必须有真实获得、现实代价与尚未确定的部分，不得设置明显正确答案、道德高地或纯粹逃避项。选项代表不同价值排序，不代表好坏。`,
   `【类型铁律】每个值必须保持自己的类型：plan.items 的每一项必须是对象；deltas 必须是对象；scene、outcome、label 等必须是字符串。严禁把对象或数组压缩成 "chapter: 1, title: …" 这样的字符串。节点对象只允许示例中的键，禁止把"场景建立""人物互动""冲突升级"等叙事分节名称当作 JSON 键。`,
-  `【节点规则】唯一节点的 chapter 必须为 1、chapterEnd 必须为 true，并带 20 字以上的 coach；所有选项禁止出现 nextNodeId 字段；deltas 使用 career / wisdom / happiness / relationship / courage 五个键，值为 -3 到 3 的整数，未变化的维度可省略。`,
+  `【节点规则】唯一节点的 chapter 必须为 1、chapterEnd 必须为 true，并带 20 字以上的 coach；所有选项禁止出现 nextNodeId 字段；deltas 使用 career / wisdom / happiness / relationship / courage 五个键，值为 0 到 3 的整数（属性只增不减，代价写进 cost 文案，禁止负值），未变化的维度可省略。`,
   `【因果规则】每个选项必须绑定 2—3 个 effects，domain 只能是 career / economy / relationship / selfFulfillment；同时给出 pathType、expectedConsequence 和 1—3 章内兑现期限。effects.to 必须写成选择后已经成立的具体状态，consequence 必须能在后续场景中被角色行动、对话或资源变化明确证明。`,
   `【正文要求】首章 scene 写 300—500 字、拆成 5—8 个短自然段，每段 30—90 字且不超过 120 字；每个 outcome 写 120—220 字、拆成 2—4 个短自然段，每段不超过 90 字。连续两个少于 25 字且表达同一动作或情绪的微小段落必须合并；完整对白可单独成段，叙述中的短引用保留在原句。段落间必须用 \\n\\n；前端最多合并为 4 页正文再加 1 页选择，禁止机械拆句、分节小标题或提纲式输出。`,
 ].join("\n");
@@ -376,7 +383,7 @@ export function buildChapterPrompt(input: ChapterInput): {
     `8. 输出格式：只输出 JSON，顶层只允许 "story" 与 "callbacks" 两个键，禁止添加其他键。严格按下面的格式示例输出（示例中的"（…）"占位文字只是说明，实际内容必须完整真实；示例的 chapter 为 1，本次输出每个节点的 chapter 必须全部等于 ${input.targetChapter}；第一个示例是纯叙事节点——没有 choices 字段，第二个示例是抉择节点）：`,
     `   { "story": [ ${EXAMPLE_PLAIN_NODE}, ${EXAMPLE_NODE} ], "callbacks": [ { "eventId": "（账本中的原始ID）", "evidence": "（从本章内容原样复制的证据）" } ] }`,
     `9. 新选择也必须绑定 2—3 个 effects（career / economy / relationship / selfFulfillment），并给出 pathType、expectedConsequence 与 1—3 章内的 consequenceDueInChapters。effects.to 必须是选择后已经成立、后文不得无故推翻的具体事实。`,
-    `10. 类型铁律：每个值必须保持自己的类型，严禁把对象或数组压缩成 "key: value" 字符串；deltas 只能使用 career / wisdom / happiness / relationship / courage 五个键且值必须是数字，禁止写 economy / selfFulfillment；节点对象只允许示例中的键，禁止把"场景建立""人物互动""冲突升级"等叙事分节名称当作 JSON 键。`,
+    `10. 类型铁律：每个值必须保持自己的类型，严禁把对象或数组压缩成 "key: value" 字符串；deltas 只能使用 career / wisdom / happiness / relationship / courage 五个键且值必须是 0 到 3 的非负整数（属性只增不减，代价写进 cost 文案，禁止负值），禁止写 economy / selfFulfillment；节点对象只允许示例中的键，禁止把"场景建立""人物互动""冲突升级"等叙事分节名称当作 JSON 键。`,
     `11. 现实规则：时间、金钱、身体、职场权力和人际关系都必须遵守常识。任何机会、原谅、升职、离职、和解或资源变化都要有过程，不能用巧合或突然出现的贵人无代价解决。`,
     `12. 正文要求：scene 写 320—520 字、拆成 6—10 个短自然段，每段 30—90 字且不超过 120 字；outcome 写 140—260 字、拆成 3—5 个短自然段，每段不超过 90 字。连续两个少于 25 字且表达同一动作或情绪的微小段落必须合并；完整对白可单独成段，叙述中的短引用保留在原句。段落间必须用 \\n\\n；前端最多合并为 4 页正文再加 1 页选择，禁止机械拆句、分节小标题或提纲式输出。`,
   ].join("\n");

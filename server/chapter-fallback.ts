@@ -107,7 +107,7 @@ export function buildSafeChapter(input: SafeChapterInput): {
           cost: "继续承担当前路线的时间与压力",
           unknown: "验证期结束时条件是否已经改变",
           outcome: `${character.name}把接下来的行动拆成一周内可以完成的步骤，并写下停止条件。她没有把坚持解释成永不改变，而是决定先让这条路线产生足够证据。\n\n相关的人得到了一份明确安排，也提醒她资源并非无限。她把复盘日期写进日历：到那一天，进展、身体感受和现实成本都必须重新摆上桌面。`,
-          deltas: { career: 1, courage: 1, happiness: -1 },
+          deltas: { career: 1, courage: 1 },
           memory: `${character.name}为原路线设置了有期限的验证期`,
           effects: [
             { domain: "career", from: storyState.career, to: "原路线进入有期限的验证阶段", consequence: "后续必须出现验证结果或停止条件" },
@@ -145,7 +145,7 @@ export function buildSafeChapter(input: SafeChapterInput): {
           cost: "进展会更慢，也可能错过部分机会",
           unknown: "等待期间是否会出现新的限制",
           outcome: `${character.name}先确认了自己的最低资源线，再为当前路线设下一个检查点。检查点以前不追加新的承诺，检查点到来时也不允许因为已经投入而自动延长。\n\n这个决定让节奏慢下来，也让一些人感到失望。可她第一次把“可以反悔”写进计划，而不是等到耗尽以后才承认自己需要改变。`,
-          deltas: { wisdom: 2, career: -1, happiness: 1 },
+          deltas: { wisdom: 2, happiness: 1 },
           memory: `${character.name}先保护基本资源，并约定了重新选择的检查点`,
           effects: [
             { domain: "economy", from: storyState.economy, to: "基本资源线得到优先保护", consequence: "后续投入不得越过已设定的资源底线" },
