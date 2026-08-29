@@ -463,13 +463,6 @@ export default function PlayPage() {
     hasPrologue && current.chapter === 1
       ? "PROLOGUE"
       : `CHAPTER ${hasPrologue ? current.chapter - 1 : current.chapter}`;
-  const chapterDeltas = sumChapter(
-    run.choices.filter(
-      (item) =>
-        nodes.find((storyNode) => storyNode.id === item.nodeId)?.chapter ===
-        current.chapter,
-    ),
-  );
   const totalGains = sumChapter(run.choices);
   const positiveTotalGains = Object.entries(totalGains).filter(
     ([, value]) => (value ?? 0) > 0,
@@ -506,7 +499,7 @@ export default function PlayPage() {
           {positiveTotalGains.map(([key, value]) => (
             <span key={key}>
               {statMeta[key]?.icon ?? ""} {statMeta[key]?.label ?? key}{" "}
-              <b>+{value}</b>
+              <b>+{Math.max(0, value)}</b>
             </span>
           ))}
         </div>
@@ -709,7 +702,8 @@ export default function PlayPage() {
                       {choiceGains.map(([key, value]) => (
                         <span key={key}>
                           {statMeta[key]?.icon ?? ""}{" "}
-                          {statMeta[key]?.label ?? key} <b>+{value}</b>
+                          {statMeta[key]?.label ?? key}{" "}
+                          <b>+{Math.max(0, value)}</b>
                         </span>
                       ))}
                     </div>
@@ -738,22 +732,6 @@ export default function PlayPage() {
               <section className="inline-coach">
                 <p className="eyebrow">{chapterLabel} · LIFE COACH</p>
                 <h3>这一章，先在这里停一下</h3>
-                <p className="chapter-summary">
-                  以下五维只记录本章变化，不代表选择的好坏。
-                </p>
-                <div className="delta-row">
-                  {Object.entries(chapterDeltas)
-                    .filter(([, value]) => value)
-                    .map(([key, value]) => (
-                      <span key={key}>
-                        <b>{statMeta[key]?.label ?? key}</b>
-                        <em className={(value || 0) > 0 ? "up" : "down"}>
-                          {(value || 0) > 0 ? "+" : ""}
-                          {value}
-                        </em>
-                      </span>
-                    ))}
-                </div>
                 <div className="coach">
                   <small>章末镜面 · 不替你决定</small>
                   <p>{current.coach}</p>
